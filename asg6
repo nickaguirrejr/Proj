@@ -193,20 +193,25 @@ public static Integer maxbt (Object tree) {
   else return Integer.MIN_VALUE;
 }
 
-public static Cons var(Object expr){
-  return 
+
+public static Cons vars (Object expr){
+  if (consp(expr))
+    return union(vars(lhs((Cons)expr)), vars(rhs((Cons)expr)));
+  if (!numberp(expr)){
+    Cons here = list(expr);
+    return here;
+  }
+  if (expr == null)
+    return null;
+  return null;
 }
 
-public static Cons vars (Object expr, Cons lst) {
-  if (consp(expr))
-    lst =cons(vars(first((Cons)expr)),lst); 
-      vars(rest((Cons)expr));
-  else if (stringp(first(expr)))
-    if (first(expr).charAt(0).isLetter()) return first(expr).charAt(0);
-  else return null;
-}
 
 public static boolean occurs(Object value, Object tree) {
+  if (consp(tree))
+    return occurs(value, lhs((Cons)tree)) || occurs(value, rhs((Cons)tree));
+  if (tree.equals(value))
+    return true;
   return false;
 }
 
