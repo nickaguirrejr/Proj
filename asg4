@@ -8,6 +8,7 @@ public class AES
 	static int keyN = 8;
 	static int nRounds = 14; // num rounds to go for a 256 bit key
 	static final boolean print = true;
+	static int bytesRead = 0;
 
 	final static int[] table = {
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -152,7 +153,7 @@ public class AES
 		for (byte[] row: arr){
 			StringBuffer sb = new StringBuffer();
 			for(byte b: row){
-				sb.append((String.format("%02x", b)) + " ");
+				sb.append(String.format("%02x", b));
 			}
 			scFile.write(sb.toString());
 		}
@@ -179,12 +180,20 @@ public class AES
 		for (byte[] row: arr){
 			StringBuffer sb = new StringBuffer();
 			for(byte b: row){
-				sb.append((String.format("%02x", b)) + " ");
+				sb.append(String.format("%02x", b));
 			}
 			scFile.write(sb.toString());
 		}
 		scFile.write("\n");
 		return arr;
+	}
+
+	public static int linearSearch(int temp){
+		for (int i = 0; i < table.length; i++){
+			if (table[i] == temp)
+				return i;
+		}
+		return -1;
 	}
 
 	public static byte[][] subBytes(byte[][] arr){
@@ -204,7 +213,9 @@ public class AES
 		for(int i = 0; i < arr.length; i++){
 			for (int j = 0; j < arr[i].length; j++){
 				int temp = (int)arr[i][j];
-				int index = Arrays.asList(table).indexOf(temp);
+				if(temp < 0)
+					temp+=256;
+				int index = linearSearch(temp);
 				if (index >= 128)
 					index -= 256;
 				arr[i][j] = (byte)index;
@@ -271,6 +282,7 @@ public class AES
 		String couplet = "";
 		for(int i = 0; i < scLine.length(); i += 2){
 			couplet = "0x" + scLine.substring(i, i+2);
+			bytesRead++;
 			mat[r][c] = (byte)(int) Integer.decode(couplet);
 			c++;
 			if(c == mat[0].length){
@@ -355,6 +367,7 @@ public class AES
 	}
 
 	public static void main (String [] args) throws IOException{
+		long startTime = System.nanoTime();
 		// check number of command line arguments
 		int argIDX = args.length;
 		if(argIDX != 3 && argIDX != 4){
@@ -429,6 +442,12 @@ public class AES
 			}
 		}
 		fw.close();
-	}
+		long stopTime = System.nanoTime();
+		if(args[argIDX].equalsIgnoreCase("E")){
+			System.out.println("Throughput of the Encryption is " + ((double)bytesRead)/((stopTime - startTime)/1000000.0) + "MB/sec.");
+		}
+		else if(args[argIDX].equalsIgnoreCase("D")){
+			System.out.println("Throughput of the Decryption is " + ((double)bytesRead)/((stopTime - startTime)/1000000.0) + "MB/sec.");
+	}}
 }
 
