@@ -1,6 +1,13 @@
+import java.util.*;
+import java.io.*;
 
 public class AES
 {
+	static int keySize = 256; // key size = 256
+	static int keyN = 8;
+	static int nRounds = 14; // num rounds to go for a 256 bit key
+	static final boolean print = true;
+
 	final static int[] table = {
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
     0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
@@ -101,27 +108,18 @@ public class AES
     public static String fixInput(String line){
     	if (line.length() == 32)
     		return line;
-    	else if(line.length > 32)
+    	else if(line.length() > 32)
     		return line.substring(0, 32);
     	else{
     		while(line.length() < 32){
     			line += "0";
     		}
-    		return 0;
+    		return line;
     	}
     }
 
-	public static void main(String[] args)
+	public static byte[][] encrypt(byte[][] arr, byte[][] keyMatrix, File outfile)
 	{
-		
-		// for( byte[] row: arr){
-		// 	StringBuffer sb = new StringBuffer();
-		// 	for(byte a: row){
-		// 		sb.append(String.format("%02X ", a));
-		// 	}
-		// 	System.out.println(sb.toString());
-		// }
-		System.out.println();
 		int progCount = 0;
 		while (progCount < 14){
 			arr = subBytes(arr);
@@ -132,13 +130,7 @@ public class AES
 			arr = addRoundKey(arr, rKey);
 			progCount++;
 		}
-		// for( byte[] row: arr){
-		// 	StringBuffer sb = new StringBuffer();
-		// 	for(byte a: row){
-		// 		sb.append(String.format("%02X ", a));
-		// 	}
-		// 	System.out.println(sb.toString());
-		// }
+		return arr;
 	}
 
 	public static byte[][] subBytes(byte[][] arr){
@@ -183,4 +175,173 @@ public class AES
 		arr[3][0] = temp2;
 		return arr;
 	}
+
+
+	public static byte[][] buildKeyMatrix(String scLine, byte[][] mat){
+		int r = 0;
+		int c = 0;
+		String couplet = "";
+		for(int i = 0; i < scLine.length(); i += 2){
+			couplet = "0x" + scLine.substring(i, i+2);
+			mat[r][c] = (byte)(int) Integer.decode(couplet);
+			c++;
+			if(c == mat[0].length){
+				c=0;
+				r++;
+			}
+		}
+		return mat;
+	}
+	
+	public static byte[][] buildMatrix(String scLine, byte[][] mat){
+		int r = 0;
+		int c = 0;
+		String couplet = "";
+		for(int i = 0; i < scLine.length(); i += 2){
+			couplet = "0x" + scLine.substring(i, i+2);
+			System.out.println("i = "+i);
+			System.out.println("len = "+scLine.length());
+
+			mat[r][c] = (byte)(int) Integer.decode(couplet);
+			c++;
+			if(c == mat.length){
+				c=0;
+				r++;
+			}
+		}
+		return mat;
+	}
+	
+
+	public static void printMatrix(byte[][] mat){
+		for(int i = 0; i < mat.length; i++){
+			for(int j = 0; j < mat[0].length; j++){
+				System.out.print(Integer.toHexString( (int)mat[i][j] ) + " ");
+			}
+			System.out.print("\n");
+		}
+	}
+
+	public static byte[][] expandKey(byte[][] key){
+		int cols = 4 * (nRounds + 1);
+		byte[][] exKey = new byte[4][cols];
+		int r = 0;
+		int c = 0;
+		byte[][] temp = new byte[1][4];
+		int[][] rcon = { {1}, {0}, {0}, {0} };
+		int mod = 4;
+		if(keyN == 6){mod = 6;}
+		for(c = 0; c < cols; c++){
+			if(c < keyN){
+				exKey[0][c] = key[0][c];
+				exKey[1][c] = key[1][c];
+				exKey[2][c] = key[2][c];
+				exKey[3][c] = key[3][c];
+			}
+			else{
+				if(c % mod != 0){
+					exKey[0][c] = (byte) (exKey[0][c-keyN] ^ exKey[0][c-1]);
+					exKey[1][c] = (byte) (exKey[1][c-keyN] ^ exKey[1][c-1]);
+					exKey[2][c] = (byte) (exKey[2][c-keyN] ^ exKey[2][c-1]);
+					exKey[3][c] = (byte) (exKey[3][c-keyN] ^ exKey[3][c-1]);
+				}
+				else{
+					// rotWord
+					temp[0][0] = exKey[1][c-1];
+					temp[1][0] = exKey[2][c-1];
+					temp[2][0] = exKey[3][c-1];
+					temp[3][0] = exKey[0][c-1];
+					// subBytes
+					temp = subBytes(temp);
+					// xor with rcon
+					temp[0][0] = (byte) (temp[0][0] ^ rcon[0][0]);
+					temp[1][0] = (byte) (temp[1][0] ^ rcon[1][0]);
+					temp[2][0] = (byte) (temp[2][0] ^ rcon[2][0]);
+					temp[3][0] = (byte) (temp[3][0] ^ rcon[3][0]);
+					// increment rcon for next round
+					rcon[0][0] *= 2;
+
+					exKey[0][c] = (byte) (exKey[0][c-keyN] ^ temp[0][0]);
+					exKey[1][c] = (byte) (exKey[1][c-keyN] ^ temp[1][0]);
+					exKey[2][c] = (byte) (exKey[2][c-keyN] ^ temp[2][0]);
+					exKey[3][c] = (byte) (exKey[3][c-keyN] ^ temp[3][0]);
+		}	}	}
+		return exKey;	
+	}
+
+	public static void main (String [] args) throws IOException{
+		// check number of command line arguments
+		int argIDX = args.length;
+		if(argIDX != 3 && argIDX != 4){
+			System.out.println("Not enough params. Exiting.");
+			System.exit(-1); // not enough arguments
+		}
+		argIDX = argIDX - 3;
+		if(! (args[argIDX].equalsIgnoreCase("E") || args[argIDX].equalsIgnoreCase("D")) ){
+			System.out.println("To encrypt, type \"E\". To decrypt, type \"E\". Exiting.");
+			System.exit(-1); // invalid input
+		}
+		
+		// enables code to run in different levels: AES-128, AES-192 or AES-256
+		if(argIDX == 1){
+			if(args[0].equals("256"))
+				keySize = 256;
+			else if(args[0].equals("192"))
+				keySize = 192;
+			else if(args[0].equals("128"))
+				keySize = 128;
+			else
+				System.exit(-1); // invalid input
+		}
+		if(keySize == 192){keyN = 6;}
+		if(keySize == 128){keyN = 4;}
+
+		// initialize other the variables from command line
+		String option = args[argIDX];
+		File keyFile = new File(args[argIDX + 1]);
+		String fileName = args[argIDX + 2];
+		File inputFile = new File(fileName);
+		if(option.equalsIgnoreCase("E")) {fileName = fileName + ".enc";}
+		else {fileName = fileName + ".dec";}
+		File outFile = new File("output.txt");
+		outFile.createNewFile();
+
+		// initialize inputText and key matricies
+		byte[][] inputMatrix = new byte[4][4];
+		byte[][] keyMatrix = new byte[4][keyN];
+
+		Scanner scK = new Scanner(keyFile);
+		String scLine = scK.next();
+		keyMatrix = buildKeyMatrix(scLine, keyMatrix);
+		scK.close();
+		byte[][] exKeyMatrix = expandKey(keyMatrix);
+
+		Scanner scIn = new Scanner(inputFile);
+		while(scIn.hasNext()){
+			scLine = scIn.next();
+			if(scLine.length() != 32)
+				scLine = fixInput(scLine);
+			byte[][] inputText = buildMatrix(scLine, inputMatrix);
+
+			if(print){
+				System.out.println("The Plaintext is:");
+				printMatrix(inputText);
+				System.out.println("The CipherKey is:");
+				printMatrix(keyMatrix);
+				System.out.println("The expanded key is:");
+				printMatrix(exKeyMatrix);
+			}
+
+			if(option.equalsIgnoreCase("E")){
+				encrypt(inputMatrix, exKeyMatrix, outFile);
+			}
+			else if(option.equalsIgnoreCase("D")){
+				// decrypt(inputMatrix, exKeyMatrix, outFile);
+			}
+			else{
+				// Throw IO Exception? Invalid option
+			}
+		}
+	}
 }
+
