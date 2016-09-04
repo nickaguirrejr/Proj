@@ -122,13 +122,13 @@ public class AES
 	} // invMixColumn2
 
     public static String fixInput(String line){
-    	if (line.length() == 32)
+    	if (line.length() == 16)
     		return line;
-    	else if(line.length() > 32)
-    		return line.substring(0, 32);
+    	else if(line.length() > 16)
+    		return line.substring(0, 16);
     	else{
-    		while(line.length() < 32){
-    			line += "0";
+    		while(line.length() < 16){
+    			line += " ";
     		}
     		return line;
     	}
@@ -182,9 +182,8 @@ public class AES
 			for(byte b: row){
 				sb.append(String.format("%02x", b));
 			}
-			scFile.write(sb.toString());
+			scFile.write(toStr(sb.toString()));
 		}
-		scFile.write("\n");
 		return arr;
 	}
 
@@ -305,10 +304,45 @@ public class AES
 				c=0;
 				r++;
 			}
+			if(r == mat.length){
+				break;
+			}
 		}
 		return mat;
 	}
+
+	public static String toHex(String line){
+		String res = "";
+		for(int i = 0; i < line.length(); i++){
+			char ch = line.charAt(i);
+			if(ch == ' '){ res += "20";}
+			else{
+				String hex = Integer.toHexString((int)ch);
+				res+=hex;
+			}
+		}
+		return res;
+	}
 	
+	public static String toStr(String line){
+		String res = "";
+		for(int i = 0; i < line.length(); i+=2){
+			String curr = "0x" + line.substring(i, i+2);
+			char ch = (char)(int)Integer.decode(curr);
+			res+=ch;
+		}
+		return res;
+	}
+
+	public static String lineNext(String scLine){
+		int len = scLine.length();
+		if(len <= 16){
+			return "";
+		}
+		else{
+			return scLine.substring(16, len);
+		}
+	}
 
 	public static void printMatrix(byte[][] mat){
 		for(int i = 0; i < mat.length; i++){
@@ -367,7 +401,6 @@ public class AES
 	}
 
 	public static void main (String [] args) throws IOException{
-		long startTime = System.nanoTime();
 		// check number of command line arguments
 		int argIDX = args.length;
 		if(argIDX != 3 && argIDX != 4){
@@ -379,20 +412,6 @@ public class AES
 			System.out.println("To encrypt, type \"E\". To decrypt, type \"E\". Exiting.");
 			System.exit(-1); // invalid input
 		}
-		
-		// enables code to run in different levels: AES-128, AES-192 or AES-256
-		if(argIDX == 1){
-			if(args[0].equals("256"))
-				keySize = 256;
-			else if(args[0].equals("192"))
-				keySize = 192;
-			else if(args[0].equals("128"))
-				keySize = 128;
-			else
-				System.exit(-1); // invalid input
-		}
-		if(keySize == 192){keyN = 6;}
-		if(keySize == 128){keyN = 4;}
 
 		// initialize other the variables from command line
 		String option = args[argIDX];
@@ -417,37 +436,23 @@ public class AES
 
 		Scanner scIn = new Scanner(inputFile);
 		while(scIn.hasNext()){
-			scLine = scIn.next();
-			if(scLine.length() != 32)
-				scLine = fixInput(scLine);
-			byte[][] inputText = buildMatrix(scLine, inputMatrix);
-
-			// if(print){
-			// 	System.out.println("The Plaintext is:");
-			// 	printMatrix(inputText);
-			// 	System.out.println("The CipherKey is:");
-			// 	printMatrix(keyMatrix);
-			// 	System.out.println("The expanded key is:");
-			// 	printMatrix(exKeyMatrix);
-			// }
-
+			scLine = scIn.nextLine();
 			if(option.equalsIgnoreCase("E")){
-				encrypt(inputMatrix, exKeyMatrix, fw);
-			}
-			else if(option.equalsIgnoreCase("D")){
-				decrypt(inputMatrix, exKeyMatrix, fw);
+				do{
+					String temp = scLine;
+					scLine = fixInput(scLine);
+					scLine = toHex(scLine);
+					byte[][] inputText = buildMatrix(scLine, inputMatrix);
+					encrypt(inputMatrix, exKeyMatrix, fw);
+					scLine = lineNext(temp);
+				}while(scLine.length() != 0);
 			}
 			else{
-				// Throw IO Exception? Invalid option
+				byte[][] inputText = buildMatrix(scLine, inputMatrix);
+				decrypt(inputMatrix, exKeyMatrix, fw);
 			}
 		}
 		fw.close();
-		long stopTime = System.nanoTime();
-		if(args[argIDX].equalsIgnoreCase("E")){
-			System.out.println("Throughput of the Encryption is " + ((double)bytesRead)/((stopTime - startTime)/1000000.0) + "MB/sec.");
-		}
-		else if(args[argIDX].equalsIgnoreCase("D")){
-			System.out.println("Throughput of the Decryption is " + ((double)bytesRead)/((stopTime - startTime)/1000000.0) + "MB/sec.");
-	}}
+	}
 }
 
